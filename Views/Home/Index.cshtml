@@ -1,0 +1,169 @@
+﻿@model UnitConversion
+@{
+    ViewData["Title"] = "Unit Converter";
+}
+
+<h1 class="text-center my-4">Unit Converter</h1>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6" style="background-color: #f0f0f0; padding: 20px; border-radius: 10px;">
+            <div class="form-group mt-4">
+                <label for="ConversionType">Conversion Type:</label>
+                <select id="ConversionType" name="ConversionType" class="form-control" required>
+                    <option value="">Select Conversion Type</option>
+                    @foreach (ConversionType type in Enum.GetValues(typeof(ConversionType)))
+                    {
+                        <option value="@type.GetHashCode()">@type.GetDescription()</option>
+                    }
+                </select>
+                <span id="conversionTypeError" class="text-danger"></span>
+            </div>
+            <div class="form-group mt-4">
+                <label for="InputUnit">Input Unit:</label>
+                <select id="InputUnit" name="InputUnit" class="form-control" required>
+                    <option value="">Select Input Unit</option>
+                </select>
+                <span id="inputUnitError" class="text-danger"></span>
+            </div>
+            <div class="form-group mt-4">
+                <label for="InputValue">Input Value:</label>
+                <input type="number" id="InputValue" name="InputValue" class="form-control" required />
+                <span id="inputValueError" class="text-danger"></span>
+            </div>
+            <div class="form-group mt-4">
+                <label for="OutputUnit">Output Unit:</label>
+                <select id="OutputUnit" name="OutputUnit" class="form-control" required>
+                    <option value="">Select Output Unit</option>
+                </select>
+                <span id="outputUnitError" class="text-danger"></span>
+            </div>
+
+            <button id="convertButton" class="btn btn-primary btn-block mt-4">Convert</button>
+
+            <div id="conversionResult" class="mt-4">
+                <h2>Conversion Result</h2>
+                <div class="alert alert-success">
+                    <p><strong><span id="inputValueRes"></span> <span id="inputUnitRes"></span></strong> is equal to <strong><span id="outputValueRes"></span> <span id="outputUnitRes"></span></strong> <button type="button" id="closeButton" class="btn-close" aria-label="Close"></button></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function () {
+        $('#conversionResult').attr("hidden", true);
+        onConvert();
+        getOutputUnits();
+    });
+
+    function getOutputUnits() {
+        $('#ConversionType').change(function () {
+            var conversionType = parseInt($(this).val());
+            $.ajax({
+                url: '/Converter/GetOutputUnits',
+                type: 'GET',
+                contentType: 'application/json',
+                data: {
+                    outputType: conversionType
+                },
+                success: function (data) {
+                    $('#OutputUnit').empty();
+                    $('#InputUnit').empty();
+                    $.each(data, function (index, item) {
+                        $('#OutputUnit').append($('<option>', {
+                            value: item.value,
+                            text: item.text
+                        }));
+                        $('#InputUnit').append($('<option>', {
+                            value: item.value,
+                            text: item.text
+                        }));
+                    });
+                },
+                error: function () {
+                    alert('Error loading output units.');
+                }
+            });
+        });
+    }
+
+    function onConvert() {
+        $('#convertButton').click(function () {
+            var conversionType = $('#ConversionType').val();
+            var inputValue = $('#InputValue').val();
+            var outputUnit = $('#OutputUnit').val();
+            var inputUnit = $('#InputUnit').val();
+
+            // Reset errors
+            $('#conversionTypeError').text('');
+            $('#inputValueError').text('');
+            $('#outputUnitError').text('');
+            $('#inputUnitError').text('');
+
+            // Validate inputs
+            var isValid = true;
+            if (!conversionType) {
+                $('#conversionTypeError').text('Please select a conversion type.');
+                isValid = false;
+            }
+            if (!inputValue) {
+                $('#inputValueError').text('Please enter an input value.');
+                isValid = false;
+            }
+            if (!outputUnit) {
+                $('#outputUnitError').text('Please enter an output unit.');
+                isValid = false;
+            }
+            if (!inputUnit) {
+                $('#inputUnitError').text('Please enter an input unit.');
+                isValid = false;
+            }
+            if (inputUnit == outputUnit) {
+                $('#inputUnitError').text('Input unit and output unit should not be same.');
+                $('#outputUnitError').text('Input unit and output unit should not be same.');
+                isValid = false;
+            }
+
+            if (isValid) {
+                var jsonstring = JSON.stringify({
+                    conversionType: parseInt(conversionType),
+                    inputValue: parseFloat(inputValue),
+                    outputValue: 0,
+                    outputUnitType: parseInt(outputUnit),
+                    inputUnitType: parseInt(inputUnit),
+                });
+                // Perform Ajax request
+                $.ajax({
+                    contentType: 'application/json',
+                    url: '/Converter/Convert',
+                    type: 'POST',
+                    data: jsonstring,
+                    success: function (data) {
+                        $('#conversionResult').attr("hidden", false);
+                        $("#inputValueRes").text(data.inputValue);
+                        $("#inputUnitRes").text(data.inputUnitTypeString);
+                        $("#outputValueRes").text(data.outputValue);
+                        $("#outputUnitRes").text(data.outputUnitTypeString);
+                    },
+                    error: function () {
+                        alert('Error converting values.');
+                    }
+                });
+            }
+        });
+
+        $("#closeButton").click(function () {
+            $('#conversionResult').attr("hidden", true);
+            removeValues();
+        });
+
+        function removeValues() {
+            $('#ConversionType').val("");
+            $('#InputValue').val("");
+            $('#OutputUnit').empty();
+            $('#InputUnit').empty();
+        }
+    }
+</script>
